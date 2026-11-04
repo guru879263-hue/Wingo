@@ -1,5 +1,4 @@
 name: Fetch Data
-
 on:
   push:
     branches: [ main ]
@@ -12,18 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
       - uses: actions/checkout@v3
 
-      - name: Fetch Game Data
+      - name: Fetch Data via Proxy
         run: |
-          curl -s -H "User-Agent: Mozilla/5.0" -H "Accept: application/json" "https://draw.ar-lottery01.com/WinGo/WinGo_30S/GetHistoryIssuePage.json" -o data.json
+          curl -s "https://api.allorigins.win/raw?url=https://draw.ar-lottery01.com/WinGo/WinGo_30S/GetHistoryIssuePage.json" -o data.json
 
       - name: Commit and Push
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "Bot"
+          git config --global user.email "bot@bot.com"
           git add data.json
           git commit -m "Update Data [skip ci]" || exit 0
           git push
