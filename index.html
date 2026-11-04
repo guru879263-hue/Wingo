@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WinGo 50 Patterns AI</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0a0a0a; color: #fff; font-family: Arial, sans-serif; padding: 10px; display: flex; justify-content: center; }
+        .main-container { width: 100%; max-width: 850px; display: flex; flex-direction: row; gap: 15px; flex-wrap: wrap; }
+        .left-col { flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 15px; }
+        .timer-panel { background: #1e1e1e; border: 2px solid #ff9900; border-radius: 10px; padding: 15px; text-align: center; }
+        .timer-title { font-size: 14px; color: #aaa; text-transform: uppercase; }
+        .timer-value { font-size: 48px; font-weight: bold; color: #ff9900; margin: 5px 0; }
+        .status-bar { text-align: center; font-size: 14px; font-weight: bold; color: #00ff00; }
+        .prediction-panel { background: #1a1a1a; border: 2px solid #333; border-radius: 10px; padding: 20px; }
+        .panel-header { font-size: 16px; color: #00aaff; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .data-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #222; }
+        .data-row:last-child { border-bottom: none; }
+        .data-label { color: #aaa; font-size: 14px; }
+        .data-value { font-size: 20px; font-weight: bold; }
+        .period-text { font-size: 14px; color: #ffaa00; word-break: break-all; text-align: right; max-width: 60%; }
+        .size-big { color: #ffaa00; }
+        .size-small { color: #00aaff; }
+        .right-col { flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 15px; }
+        .result-panel { background: #111; border: 2px solid #00aaff; border-radius: 10px; padding: 20px; text-align: center; }
+        .actual-result-text { font-size: 40px; font-weight: bold; margin: 15px 0; }
+        .status-win { color: #00ff00; font-size: 30px; font-weight: bold; }
+        .status-loss { color: #ff0000; font-size: 30px; font-weight: bold; }
+        .status-pending { color: #ffff00; font-size: 30px; font-weight: bold; }
+        .history-panel { background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 15px; }
+        .history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .history-table th { background: #222; padding: 10px; text-align: left; color: #aaa; }
+        .history-table td { padding: 10px; border-bottom: 1px solid #333; }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="left-col">
+            <div class="timer-panel">
+                <div class="timer-title">WinGo 30 Sec</div>
+                <div class="timer-value" id="timer">30</div>
+                <div class="status-bar" id="api-status">Connecting...</div>
+            </div>
+            <div class="prediction-panel">
+                <div class="panel-header">🎯 Prediction</div>
+                <div class="data-row">
+                    <span class="data-label">Last Period:</span>
+                    <span class="data-value period-text" id="last-period">-</span>
+                </div>
+                <div class="data-row">
+                    <span class="data-label">Our Prediction:</span>
+                    <span class="data-value" id="prediction-text">Loading...</span>
+                </div>
+                <div class="data-row">
+                    <span class="data-label">Detected Pattern:</span>
+                    <span class="data-value" id="pattern-text" style="color:#ff9900;">-</span>
+                </div>
+            </div>
+        </div>
+        <div class="right-col">
+            <div class="result-panel">
+                <div class="panel-header" style="border:none; margin:0; padding:0; color:#fff;">Actual Result</div>
+                <div class="actual-result-text" id="actual-result-text">-</div>
+                <div id="round-status" class="status-pending">⏳ Pending</div>
+            </div>
+            <div class="history-panel">
+                <div class="panel-header" style="color:#fff;">📊 Latest 5 Results</div>
+                <table class="history-table">
+                    <thead><tr><th>Period</th><th>Num</th><th>Size</th></tr></thead>
+                    <tbody id="history-body"><tr><td colspan="3" style="text-align:center;">Waiting...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 🔴 YAHAN APNA USERNAME DAALEIN 🔴
+        const GITHUB_JSON_URL = "https://YOUR_USERNAME.github.io/wingo-ai/data.json";
+        
+        let countdown = 30;
+        let timerInterval;
+        let lastFetchedPeriod = "";
+        let currentPredictionSize = "PENDING";
+
+        async function fetchLiveData() {
+            try {
+                document.getElementById('api-status').textContent = "Syncing...";
+                document.getElementById('api-status').style.color = "#ffff00";
+                
+                const response = await fetch(GITHUB_JSON_URL + "?t=" + new Date().getTime());
+                const data = await response.json();
+                
+                if (data && data.data && data.data.list && data.data.list.length > 0) {
+                    document.getElementById('api-status').textContent = "✅ Live Data Connected";
+                    document.getElementById('api-status').style.color = "#00ff00";
+                    processGameData(data.data.list);
+                } else {
+                    document.getElementById('api-status').textContent = "⚠️ Syncing Error";
+                    document.getElementById('api-status').style.color = "#ff0000";
+                }
+            } catch (error) {
+                document.getElementById('api-status').textContent = "❌ Sync Error (Wait 1 Min)";
+                document.getElementById('api-status').style.color = "#ff0000";
+            }
+        }
+
+        function processGameData(list) {
+            const latest = list[0];
+            const latestPeriod = latest.issueNumber;
+            if (latestPeriod !== lastFetchedPeriod) {
+                const actualNum = parseInt(latest.number);
+                const actualSize = actualNum >= 5 ? "BIG" : "SMALL";
+                const actualEl = document.getElementById('actual-result-text');
+                actualEl.textContent = `${actualSize} (${actualNum})`;
+                actualEl.style.color = actualSize === "BIG" ? "#ffaa00" : "#00aaff";
+
+                if (currentPredictionSize !== "PENDING") {
+                    const statusEl = document.getElementById('round-status');
+                    if (currentPredictionSize === actualSize) {
+                        statusEl.textContent = "✅ WIN";
+                        statusEl.className = "status-win";
+                    } else {
+                        statusEl.textContent = "❌ LOSS";
+                        statusEl.className = "status-loss";
+                    }
+                }
+                lastFetchedPeriod = latestPeriod;
+                generateAdvancedPrediction(list);
+                updateHistoryTable(list.slice(0, 5));
+            }
+        }
+
+        function generateAdvancedPrediction(list) {
+            let recent20 = list.slice(0, 20);
+            let numbers = recent20.map(item => parseInt(item.number));
+            let sizes = numbers.map(n => n >= 5 ? "B" : "S"); 
+            let patternStr = sizes.join('');
+            let sum = numbers.slice(0, 5).reduce((a, b) => a + b, 0);
+            let mathPrediction = (sum % 2 === 0) ? "BIG" : "SMALL"; 
+            let patternPrediction = "BIG";
+            let patternName = "Trend Reversal";
+            const patterns = {
+                "BSBS": { name: "1. Zig-Zag", next: "B" }, "SBSB": { name: "1. Zig-Zag", next: "S" },
+                "BSSB": { name: "2. Mirror", next: "S" }, "SBBBS": { name: "2. Mirror", next: "B" },
+                "BBSB": { name: "3. Repeat", next: "B" }, "BBSS": { name: "4. Opposite", next: "B" },
+                "SSBB": { name: "4. Opposite", next: "S" }, "BBSSBB": { name: "6. Double", next: "S" },
+                "BBBSSS": { name: "7. Triple", next: "B" }, "BSBSB": { name: "8. Alternate", next: "B" },
+                "BSSSB": { name: "9. Cycle", next: "B" }, "BBBS": { name: "11. Dragon", next: "S" },
+                "BSBSSB": { name: "12. Snake", next: "S" }, "BSBB": { name: "13. Wave", next: "S" },
+                "BBBBB": { name: "14. Stair", next: "S" }, "SSSSS": { name: "14. Stair", next: "B" },
+                "BSSBB": { name: "15. Box", next: "S" }, "BBBBBB": { name: "22. Pair", next: "S" },
+                "BSSBBS": { name: "46. Square", next: "S" }
+            };
+            for (let len = 6; len >= 3; len--) {
+                if (patternStr.length >= len) {
+                    let sub = patternStr.substring(0, len);
+                    if (patterns[sub]) {
+                        patternPrediction = patterns[sub].next === "B" ? "BIG" : "SMALL";
+                        patternName = patterns[sub].name;
+                        break;
+                    }
+                }
+            }
+            let randomPrediction = Math.random() < 0.5 ? "BIG" : "SMALL";
+            let bigScore = 0, smallScore = 0;
+            if (mathPrediction === "BIG") bigScore += 50; else smallScore += 50;
+            if (patternPrediction === "BIG") bigScore += 35; else smallScore += 35;
+            if (randomPrediction === "BIG") bigScore += 15; else smallScore += 15;
+            let finalPrediction = (bigScore > smallScore) ? "BIG" : "SMALL";
+            let predictedNumber = (finalPrediction === "BIG") ? (5 + Math.floor(Math.random() * 5)) : Math.floor(Math.random() * 5);
+            currentPredictionSize = finalPrediction;
+            document.getElementById('last-period').textContent = list[0].issueNumber;
+            document.getElementById('pattern-text').textContent = patternName;
+            const predEl = document.getElementById('prediction-text');
+            predEl.textContent = `${finalPrediction} ${predictedNumber}`; 
+            predEl.className = 'data-value ' + (finalPrediction === 'BIG' ? 'size-big' : 'size-small');
+            document.getElementById('round-status').textContent = "⏳ Pending";
+            document.getElementById('round-status').className = "status-pending";
+        }
+
+        function updateHistoryTable(list) {
+            const tbody = document.getElementById('history-body');
+            tbody.innerHTML = "";
+            list.forEach(item => {
+                const num = parseInt(item.number);
+                const size = num >= 5 ? "BIG" : "SMALL";
+                const colorClass = size === "BIG" ? "size-big" : "size-small";
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="color:#888;">...${item.issueNumber.slice(-5)}</td>
+                    <td class="${colorClass}">${num}</td>
+                    <td class="${colorClass}">${size}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            countdown = 30;
+            const timerEl = document.getElementById('timer');
+            timerInterval = setInterval(() => {
+                timerEl.textContent = countdown < 10 ? `0${countdown}` : countdown;
+                if (countdown <= 0) {
+                    clearInterval(timerInterval);
+                    fetchLiveData(); 
+                    startTimer(); 
+                }
+                countdown--;
+            }, 1000);
+        }
+        fetchLiveData();
+        startTimer();
+        setInterval(fetchLiveData, 5000);
+    </script>
+</body>
+  </html>
